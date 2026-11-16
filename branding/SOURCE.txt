@@ -1,0 +1,9 @@
+Utsuho Reiuji / Okuu outline for YSpotify.
+
+Reference artwork:
+https://danmaku.jp/archive/character/c072/
+https://images.ctfassets.net/rnt9181hio7z/5GvEpT6yjINZU9ZI7Y8bOJ/536f936bf73e1dfe8236688e0d664fdb/c072_boss.png
+Original character and reference artwork: Shanghai Alice / Unknown X.
+
+The header adapts the pose and character features into a green contour.
+The source artwork is not bundled here.
