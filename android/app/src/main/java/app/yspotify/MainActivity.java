@@ -50,7 +50,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
     private final ExecutorService queries = Executors.newSingleThreadExecutor();
     private PlaybackService service;
     private Covers covers;
-    private boolean bound, binding, preview, landscape, loginChanged, started;
+    private boolean bound, binding, preview, landscape, largeText, loginChanged, started;
     private String kind = "liked", argument, heading = "Любимое", rowState = "", footerCover = "";
     private long queryVersion;
     private List<Song> rows = new ArrayList<>();
@@ -76,6 +76,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
         super.onCreate(saved);
         preview = BuildConfig.DEBUG && getIntent().getBooleanExtra("preview", false);
         landscape = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        largeText = getResources().getConfiguration().fontScale > 1.2f;
         if (saved != null) { kind = saved.getString("kind", "liked"); argument = saved.getString("argument"); heading = saved.getString("heading", "Любимое"); }
         build();
         if (preview) { covers = new Covers(this, new okhttp3.OkHttpClient()); demo(); }
@@ -102,9 +103,9 @@ public final class MainActivity extends Activity implements PlaybackService.List
             account = glyph("account", "Аккаунт", 40, this::login); account.setId(R.id.account_button); side.addView(account);
             side.addView(navigation(true), new LinearLayout.LayoutParams(-1, -2)); root.addView(body, new LinearLayout.LayoutParams(0, -1, 1));
         } else {
-            FrameLayout header = new FrameLayout(this); header.setPadding(dp(20), 0, dp(16), 0); root.addView(header, new LinearLayout.LayoutParams(-1, dp(86)));
+            FrameLayout header = new FrameLayout(this); header.setPadding(dp(20), 0, dp(16), 0); root.addView(header, new LinearLayout.LayoutParams(-1, dp(largeText ? 68 : 86)));
             header.addView(new HeaderArt(this), new FrameLayout.LayoutParams(-1, -1));
-            TextView brand = text("YSpotify", 27, INK); brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD); FrameLayout.LayoutParams brandLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL | Gravity.START); brandLayout.leftMargin = dp(4); header.addView(brand, brandLayout);
+            TextView brand = text("YSpotify", largeText ? 22 : 27, INK); brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD); FrameLayout.LayoutParams brandLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL | Gravity.START); brandLayout.leftMargin = dp(4); header.addView(brand, brandLayout);
             account = glyph("account", "Аккаунт", 44, this::login); account.setId(R.id.account_button); FrameLayout.LayoutParams accountLayout = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END | Gravity.CENTER_VERTICAL); header.addView(account, accountLayout);
             root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         }
@@ -114,7 +115,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
         Glyph find = glyph("search", "Найти", 48, this::submitSearch); find.setId(R.id.search_button); searchRow.addView(find); body.addView(searchRow, new LinearLayout.LayoutParams(-1, dp(52)));
         LinearLayout headings = column(); headings.setPadding(dp(20), dp(landscape ? 0 : 8), dp(20), dp(6));
         title = text(heading, landscape ? 20 : 25, INK); title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); headings.addView(title);
-        count = text("Твоя музыка", 12, MUTED); if (!landscape) { LinearLayout.LayoutParams sub = new LinearLayout.LayoutParams(-1, -2); sub.topMargin = dp(4); headings.addView(count, sub); } body.addView(headings);
+        count = text("Твоя музыка", 12, MUTED); if (!landscape && !largeText) { LinearLayout.LayoutParams sub = new LinearLayout.LayoutParams(-1, -2); sub.topMargin = dp(4); headings.addView(count, sub); } body.addView(headings); if (landscape && largeText) headings.setVisibility(View.GONE);
         FrameLayout content = new FrameLayout(this); body.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
         list = new ListView(this); list.setId(R.id.song_list); list.setBackgroundColor(BG); list.setDivider(null); list.setCacheColorHint(BG); list.setPadding(dp(8), 0, dp(8), dp(12)); list.setClipToPadding(true); list.setFastScrollEnabled(true); list.setScrollingCacheEnabled(false); list.setSelector(android.R.color.transparent);
         if (Build.VERSION.SDK_INT >= 29) list.setVerticalScrollbarThumbDrawable(shape(0xff537960, 8));
@@ -123,6 +124,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
         empty = text("Войди в Spotify, чтобы открыть свою музыку", 16, MUTED); empty.setSingleLine(false); empty.setMaxLines(3); empty.setGravity(Gravity.CENTER); empty.setPadding(dp(28), 0, dp(28), 0); content.addView(empty, new FrameLayout.LayoutParams(-1, -1));
         float[] touchStart = {0}; list.setOnTouchListener((view, event) -> { if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) touchStart[0] = event.getY(); if (event.getActionMasked() == android.view.MotionEvent.ACTION_UP && list.getFirstVisiblePosition() == 0 && event.getY() - touchStart[0] > dp(110)) load(true); return false; });
         status = text("", 11, MUTED); status.setId(R.id.status_text); status.setPadding(dp(20), dp(3), dp(20), dp(3)); body.addView(status);
+        status.setVisibility(View.GONE); status.addTextChangedListener(new android.text.TextWatcher() { @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { } @Override public void onTextChanged(CharSequence value, int start, int before, int count) { } @Override public void afterTextChanged(android.text.Editable value) { status.setVisibility(value.length() == 0 ? View.GONE : View.VISIBLE); } });
         body.addView(footer(), new LinearLayout.LayoutParams(-1, -2));
         if (!landscape) root.addView(navigation(false), new LinearLayout.LayoutParams(-1, dp(64)));
         setContentView(root); setNavigation();
@@ -250,7 +252,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
             setOnApplyWindowInsetsListener((view, insets) -> { view.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom()); return insets; });
             LinearLayout content = column(); content.setPadding(dp(24), dp(10), dp(24), dp(24)); addView(content, new ScrollView.LayoutParams(-1, -2));
             LinearLayout bar = row(); Glyph close = glyph("back", "Закрыть плеер", 44, () -> playerDialog.dismiss()); bar.addView(close); TextView caption = text("Сейчас играет", 15, MUTED); caption.setGravity(Gravity.CENTER); bar.addView(caption, new LinearLayout.LayoutParams(0, dp(44), 1)); Glyph actions = glyph("menu", "Действия с треком", 44, () -> { if (service == null) return; JSONObject current = J.obj(service.snapshot(), "track"); String uri = J.text(current, "requestedUri"); if (uri.isEmpty()) uri = J.text(current, "uri"); Song song = service.catalog.track(uri); if (song != null) songMenu(song); }); bar.addView(actions); content.addView(bar);
-            art = new ImageView(MainActivity.this); rounded(art); LinearLayout.LayoutParams artwork = new LinearLayout.LayoutParams(dp(landscape ? 140 : 244), dp(landscape ? 140 : 244)); artwork.gravity = Gravity.CENTER_HORIZONTAL; artwork.topMargin = dp(24); artwork.bottomMargin = dp(24); content.addView(art, artwork);
+            art = new ImageView(MainActivity.this); rounded(art); int artSize = largeText ? 96 : landscape ? 140 : 244; LinearLayout.LayoutParams artwork = new LinearLayout.LayoutParams(dp(artSize), dp(artSize)); artwork.gravity = Gravity.CENTER_HORIZONTAL; artwork.topMargin = dp(largeText ? 12 : 24); artwork.bottomMargin = dp(largeText ? 12 : 24); content.addView(art, artwork);
             name = text("", 24, INK); name.setTypeface(Typeface.DEFAULT, Typeface.BOLD); author = text("", 15, MUTED); content.addView(name); LinearLayout.LayoutParams artistLayout = new LinearLayout.LayoutParams(-1, -2); artistLayout.topMargin = dp(6); content.addView(author, artistLayout);
             seek = new SeekBar(MainActivity.this); seek.setMax(1000); seek.setProgressTintList(ColorStateList.valueOf(ACCENT)); seek.setThumbTintList(ColorStateList.valueOf(ACCENT)); LinearLayout.LayoutParams seekingLayout = new LinearLayout.LayoutParams(-1, dp(42)); seekingLayout.topMargin = dp(18); content.addView(seek, seekingLayout);
             times = text("0:00 / 0:00", 12, MUTED); content.addView(times);
@@ -298,7 +300,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
     private void demo() {
         String[][] songs = {{"Resonance", "HOME", "3:32"}, {"After Dark", "Mr.Kitty", "4:17"}, {"Nightcall", "Kavinsky", "4:18"}, {"A Walk", "Tycho", "5:17"}, {"Sunset Lover", "Petit Biscuit", "3:58"}, {"Weightless", "Marconi Union", "8:09"}, {"Nights", "Frank Ocean", "5:07"}, {"Awake", "Tycho", "4:43"}, {"Veridis Quo", "Daft Punk", "5:44"}, {"Dayvan Cowboy", "Boards of Canada", "5:00"}};
         List<Song> fixtures = new ArrayList<>(); for (int i = 0; i < songs.length; i++) fixtures.add(new Song(J.o("uri", "spotify:track:" + String.format(java.util.Locale.ROOT, "%022d", i), "name", songs[i][0], "artist", songs[i][1], "duration", songs[i][2], "saved", true)));
-        applyRows(fixtures); now.setText("Resonance"); artist.setText("HOME"); status.setText("Предпросмотр интерфейса"); cover.setImageResource(R.mipmap.ic_launcher); play.setEnabled(true); next.setEnabled(true); previous.setEnabled(true); play.setOnClickListener(view -> play.playing(true)); progress.setProgress(340);
+        applyRows(fixtures); now.setText("Resonance"); artist.setText("HOME"); cover.setImageResource(R.mipmap.ic_launcher); play.setEnabled(true); next.setEnabled(true); previous.setEnabled(true); play.setOnClickListener(view -> play.playing(true)); progress.setProgress(340);
         previewState = J.o("track", J.o("uri", fixtures.get(0).uri, "name", "Resonance", "artist", "HOME", "cover", ""), "playing", false, "busy", false, "canPrevious", true, "canNext", true, "canSeek", true, "duration", 212000, "position", 72000, "volume", .8, "shuffle", false, "repeat", "off");
     }
     private final class HeaderArt extends View {

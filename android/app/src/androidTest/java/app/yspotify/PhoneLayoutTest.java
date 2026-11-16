@@ -25,7 +25,10 @@ public class PhoneLayoutTest {
             instrumentation.waitForIdleSync();
             scenario.onActivity(activity -> { activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); }); Thread.sleep(1000); instrumentation.waitForIdleSync();
             scenario.onActivity(this::assertLayout); screenshot("portrait");
-            scenario.onActivity(activity -> { assertTrue(((View) activity.findViewById(R.id.current_title).getParent()).performClick()); }); Thread.sleep(400); instrumentation.waitForIdleSync(); screenshot("player");
+            scenario.onActivity(activity -> { assertTrue(((View) activity.findViewById(R.id.current_title).getParent()).performClick()); }); Thread.sleep(400); instrumentation.waitForIdleSync();
+            android.view.accessibility.AccessibilityNodeInfo playerWindow = instrumentation.getUiAutomation().getRootInActiveWindow(); assertNotNull(playerWindow);
+            java.util.List<android.view.accessibility.AccessibilityNodeInfo> buttons = playerWindow.findAccessibilityNodeInfosByText("Воспроизведение / пауза"); assertFalse(buttons.isEmpty());
+            Rect playerBounds = new Rect(), buttonBounds = new Rect(); playerWindow.getBoundsInScreen(playerBounds); buttons.get(0).getBoundsInScreen(buttonBounds); assertTrue(playerBounds.contains(buttonBounds)); assertTrue(buttons.get(0).isVisibleToUser()); screenshot("player");
             instrumentation.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); Thread.sleep(300);
             scenario.onActivity(activity -> activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)); Thread.sleep(1000); instrumentation.waitForIdleSync(); scenario.onActivity(this::assertLayout); screenshot("landscape");
         }
@@ -34,6 +37,7 @@ public class PhoneLayoutTest {
         View root = activity.getWindow().getDecorView(); Rect window = new Rect(); assertTrue(root.getGlobalVisibleRect(window));
         View play = activity.findViewById(R.id.play_button), previous = activity.findViewById(R.id.previous_button), next = activity.findViewById(R.id.next_button); ListView songs = activity.findViewById(R.id.song_list);
         assertEquals(10, songs.getCount()); assertTrue(songs.getHeight() > 40); Rect controls = new Rect(); assertTrue(play.getGlobalVisibleRect(controls)); assertTrue(window.contains(controls));
+        assertNotNull(songs.getChildAt(0)); assertTrue("First song is clipped", songs.getHeight() >= songs.getChildAt(0).getHeight());
         for (View control : new View[]{play, previous, next, activity.findViewById(R.id.tab_search), activity.findViewById(R.id.tab_liked), activity.findViewById(R.id.tab_library)}) { int[] point = new int[2]; control.getLocationOnScreen(point); assertTrue(point[0] >= window.left); assertTrue(point[0] + control.getWidth() <= window.right); assertTrue(point[1] + control.getHeight() <= window.bottom); }
         int[] listPosition = new int[2], playPosition = new int[2]; songs.getLocationOnScreen(listPosition); play.getLocationOnScreen(playPosition); assertTrue(listPosition[1] + songs.getHeight() <= playPosition[1]);
         songs.setSelection(9);
