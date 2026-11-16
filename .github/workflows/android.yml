@@ -1,7 +1,7 @@
 name: Android
 on:
   push:
-    paths: ['android/**', 'ci/android-ui.sh', '.github/workflows/android.yml']
+    paths: ['android/**', '!android/README.md', '!android/design/**', 'ci/android-ui.sh', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read

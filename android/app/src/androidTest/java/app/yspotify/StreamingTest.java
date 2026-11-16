@@ -38,11 +38,12 @@ public class StreamingTest {
         try (MockWebServer server = new MockWebServer()) {
             server.useHttps(serverTls.sslSocketFactory(), false);
             server.enqueue(new MockResponse().setHeader("Content-Type", "audio/wav").setBody(new Buffer().write(wave())).throttleBody(8000, 500, TimeUnit.MILLISECONDS)); server.start();
+            String stream = server.url("/fixture.wav").toString();
             instrumentation.runOnMainSync(() -> {
                 player[0] = new ExoPlayer.Builder(instrumentation.getTargetContext()).setMediaSourceFactory(new DefaultMediaSourceFactory(new OkHttpDataSource.Factory(SpotifyApi.streaming(client))))
                         .setLoadControl(new DefaultLoadControl.Builder().setBufferDurationsMs(5000, 30000, 300, 1000).build()).build();
                 player[0].setVolume(0); player[0].addListener(new Player.Listener() { @Override public void onPlayerError(PlaybackException failure) { error.set(failure); } });
-                player[0].setMediaItem(MediaItem.fromUri(server.url("/fixture.wav").toString())); player[0].prepare(); player[0].play();
+                player[0].setMediaItem(MediaItem.fromUri(stream)); player[0].prepare(); player[0].play();
             });
             try {
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(40);
