@@ -25,7 +25,7 @@ public class PhoneLayoutTest {
             instrumentation.waitForIdleSync();
             scenario.onActivity(activity -> { activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT); }); Thread.sleep(1000); instrumentation.waitForIdleSync();
             scenario.onActivity(this::assertLayout); screenshot("portrait");
-            scenario.onActivity(activity -> { activity.findViewById(R.id.current_title).performClick(); }); Thread.sleep(400); instrumentation.waitForIdleSync(); screenshot("player");
+            scenario.onActivity(activity -> { assertTrue(((View) activity.findViewById(R.id.current_title).getParent()).performClick()); }); Thread.sleep(400); instrumentation.waitForIdleSync(); screenshot("player");
             instrumentation.getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); Thread.sleep(300);
             scenario.onActivity(activity -> activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)); Thread.sleep(1000); instrumentation.waitForIdleSync(); scenario.onActivity(this::assertLayout); screenshot("landscape");
         }

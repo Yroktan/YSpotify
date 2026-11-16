@@ -42,7 +42,7 @@ final class SpotifyEngine implements AutoCloseable {
     private long revision, sequence;
     private WebSocket dealer;
     private String endedState = "";
-    private boolean registered, closed, commanding;
+    private volatile boolean registered, closed, commanding;
     volatile byte[] certificate;
     private static final class CachedUrl { final String url; final long until; CachedUrl(String url) { this.url = url; until = System.currentTimeMillis() + 120000; } }
     SpotifyEngine(SpotifyApi api, Catalog catalog, Listener listener) { this.api = api; this.catalog = catalog; this.listener = listener; }
@@ -122,6 +122,7 @@ final class SpotifyEngine implements AutoCloseable {
     private JSONObject send(JSONObject command) throws Exception { return api.player("/connect-state/v1/player/command/from/" + device + "/to/" + device, "POST", J.o("command", command)); }
     void play(String uri, String context, long expectedGeneration) throws Exception {
         if (generation.get() != expectedGeneration) return; initialize();
+        if (closed || generation.get() != expectedGeneration) return;
         commanding = true;
         try {
             long before; synchronized (this) { before = revision; }

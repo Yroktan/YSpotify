@@ -20,6 +20,10 @@ function Write-Archive([string]$Name,[string[]]$Files,[string]$Prefix){
  Get-Item -LiteralPath $target | Select-Object Name,Length
 }
 $sourceFiles+=@('player/service.test.cjs','player/auth.test.cjs','player/catalog.test.cjs','validation/quick-check.json','validation/endurance-check.json','validation/latency-check.json','THIRD_PARTY_NOTICES.txt')
+$sourceFiles+=@('build-android.ps1','.github/workflows/android.yml','ci/android-ui.sh','android/README.md','android/build.gradle','android/settings.gradle','android/gradle.properties','android/gradlew','android/gradlew.bat','android/gradle/wrapper/gradle-wrapper.jar','android/gradle/wrapper/gradle-wrapper.properties','android/app/build.gradle','android/app/proguard-rules.pro')
+foreach($directory in @('android/app/src/main','android/app/src/test','android/app/src/androidTest')){
+ $sourceFiles+=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot $directory) -Recurse -File | Where-Object {$_.Extension -in @('.java','.xml','.png','.json','.txt')} | ForEach-Object {$_.FullName.Substring($PSScriptRoot.Length+1).Replace('\','/')})
+}
 Write-Archive 'YSpotify-source.zip' $sourceFiles ''
 if(-not $SourceOnly){
  $runtime=Join-Path $PSScriptRoot 'runtime/ECS'

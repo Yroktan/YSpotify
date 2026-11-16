@@ -27,6 +27,7 @@ import okhttp3.Response;
 final class SessionStore {
     private final File file;
     private volatile JSONObject value;
+    private long revision;
     private final Object refreshLock = new Object();
     interface Refresher { JSONObject refresh(JSONObject previous) throws Exception; }
     volatile Refresher fallback;
@@ -82,8 +83,9 @@ final class SessionStore {
         File temporary = new File(file.getPath() + ".tmp"); Files.write(temporary.toPath(), packed.array());
         Files.move(temporary.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         value = J.parse(next.toString());
+        revision++;
     }
-    synchronized void clear() { value = null; if (file.exists()) file.delete(); }
+    synchronized void clear() { revision++; value = null; if (file.exists()) file.delete(); }
     Map<String, String> headers() {
         JSONObject value = snapshot();
         Map<String, String> result = new LinkedHashMap<>();
@@ -98,12 +100,16 @@ final class SessionStore {
     }
     void refresh(OkHttpClient http) throws Exception {
         synchronized (refreshLock) {
-            try { refreshHttp(http); }
-            catch (Exception failure) { if (fallback == null) throw failure; save(fallback.refresh(snapshot())); }
+            long expected; JSONObject previous;
+            synchronized (this) { if (!exists()) throw new IllegalStateException("SessionRequired"); expected = revision; previous = snapshot(); }
+            JSONObject next;
+            try { next = refreshHttp(http, previous); }
+            catch (Exception failure) { if (fallback == null) throw failure; next = fallback.refresh(previous); }
+            synchronized (this) { if (revision != expected || !exists()) throw new IllegalStateException("SessionChanged"); save(next); }
         }
     }
-    private void refreshHttp(OkHttpClient http) throws Exception {
-        String cookie = J.text(value, "cookie");
+    private JSONObject refreshHttp(OkHttpClient http, JSONObject previous) throws Exception {
+        String cookie = J.text(previous, "cookie");
         if (cookie.isEmpty()) throw new IllegalStateException("SessionRefreshRequired");
         Request request = new Request.Builder().url("https://open.spotify.com/").header("Cookie", cookie).header("Cache-Control", "no-cache").build();
         try (Response response = http.newCall(request).execute()) {
@@ -117,13 +123,13 @@ final class SessionStore {
             long server = System.currentTimeMillis();
             try { server = ZonedDateTime.parse(response.header("Date", ""), DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli(); } catch (Exception ignored) { }
             long ttl = Math.max(60000, Math.min(3600000, expiry - server));
-            JSONObject next = snapshot(); next.put("bearer", "Bearer " + token); next.put("validUntil", System.currentTimeMillis() + ttl);
+            JSONObject next = J.parse(previous.toString()); next.put("bearer", "Bearer " + token); next.put("validUntil", System.currentTimeMillis() + ttl);
             Map<String, String> retained = new LinkedHashMap<>();
             for (String part : cookie.split(";")) { String[] pair = part.trim().split("=", 2); if (pair.length == 2) retained.put(pair[0], pair[1]); }
             for (String header : response.headers("Set-Cookie")) { String[] pair = header.split(";", 2)[0].split("=", 2); if (pair.length == 2 && (pair[0].equals("sp_dc") || pair[0].equals("sp_key"))) retained.put(pair[0], pair[1]); }
             StringBuilder updated = new StringBuilder();
             for (Map.Entry<String, String> entry : retained.entrySet()) { if (updated.length() > 0) updated.append("; "); updated.append(entry.getKey()).append('=').append(entry.getValue()); }
-            next.put("cookie", updated.toString()); save(next);
+            next.put("cookie", updated.toString()); return next;
         }
     }
 }

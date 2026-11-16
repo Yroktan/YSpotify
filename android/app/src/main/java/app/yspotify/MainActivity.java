@@ -50,7 +50,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
     private final ExecutorService queries = Executors.newSingleThreadExecutor();
     private PlaybackService service;
     private Covers covers;
-    private boolean bound, preview, landscape, loginChanged, started;
+    private boolean bound, binding, preview, landscape, loginChanged, started;
     private String kind = "liked", argument, heading = "Любимое", rowState = "", footerCover = "";
     private long queryVersion;
     private List<Song> rows = new ArrayList<>();
@@ -67,7 +67,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
     private JSONObject previewState;
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
-            service = ((PlaybackService.LocalBinder) binder).service(); bound = true; covers = new Covers(MainActivity.this, service.api.http); if (started) service.addListener(MainActivity.this);
+            service = ((PlaybackService.LocalBinder) binder).service(); bound = true; if (covers != null) covers.close(); covers = new Covers(MainActivity.this, service.api.http); if (started) service.addListener(MainActivity.this);
             if (loginChanged) reloadSession(); else load(false);
         }
         @Override public void onServiceDisconnected(ComponentName name) { bound = false; service = null; status.setText("Плеер остановлен. Открой приложение ещё раз."); }
@@ -79,7 +79,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
         if (saved != null) { kind = saved.getString("kind", "liked"); argument = saved.getString("argument"); heading = saved.getString("heading", "Любимое"); }
         build();
         if (preview) { covers = new Covers(this, new okhttp3.OkHttpClient()); demo(); }
-        else bindService(new Intent(this, PlaybackService.class), connection, BIND_AUTO_CREATE);
+        else binding = bindService(new Intent(this, PlaybackService.class), connection, BIND_AUTO_CREATE);
     }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
@@ -185,7 +185,7 @@ public final class MainActivity extends Activity implements PlaybackService.List
     }
     private void wakePlayback() { startForegroundService(new Intent(this, PlaybackService.class).setAction("wake")); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putString("kind", kind); state.putString("argument", argument); state.putString("heading", heading); super.onSaveInstanceState(state); }
-    @Override protected void onDestroy() { queryVersion++; if (bound) { service.removeListener(this); unbindService(connection); } if (covers != null) covers.close(); queries.shutdownNow(); main.removeCallbacksAndMessages(null); if (playerDialog != null) playerDialog.dismiss(); super.onDestroy(); }
+    @Override protected void onDestroy() { queryVersion++; if (service != null) service.removeListener(this); if (binding) unbindService(connection); if (covers != null) covers.close(); queries.shutdownNow(); main.removeCallbacksAndMessages(null); if (playerDialog != null) playerDialog.dismiss(); super.onDestroy(); }
     private void login() {
         if (preview) return;
         if (service == null || !service.api.session.exists()) { startActivityForResult(new Intent(this, LoginActivity.class), 11); return; }

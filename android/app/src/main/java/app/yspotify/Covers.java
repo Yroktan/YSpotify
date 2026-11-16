@@ -32,10 +32,11 @@ final class Covers {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final File directory;
     private final OkHttpClient http;
-    private boolean deferred;
+    private boolean deferred, closed;
     Covers(Context context, OkHttpClient http) { directory = new File(context.getCacheDir(), "covers"); directory.mkdirs(); this.http = http; }
     void defer(boolean value) { deferred = value; }
     void bind(ImageView view, String url, int size) {
+        if (closed) return;
         String key = url + ':' + size; view.setTag(key); Bitmap cached = images.get(key); if (cached != null) { view.setImageBitmap(cached); return; } view.setImageDrawable(null);
         if (deferred || url.isEmpty() || failed.containsKey(key) && failed.get(key) > System.currentTimeMillis()) return;
         if (pending.containsKey(key)) { pending.get(key).add(new WeakReference<>(view)); return; }
@@ -58,8 +59,8 @@ final class Covers {
                 Bitmap decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options); result = Bitmap.createScaledBitmap(decoded, size, size, true); if (decoded != result) decoded.recycle();
             } catch (Exception ignored) { }
             Bitmap completed = result;
-            main.post(() -> { if (completed != null) images.put(key, completed); else failed.put(key, System.currentTimeMillis() + 60000); List<WeakReference<ImageView>> references = pending.remove(key); if (references != null) for (WeakReference<ImageView> reference : references) { ImageView target = reference.get(); if (target != null && key.equals(target.getTag()) && completed != null) target.setImageBitmap(completed); } });
+            main.post(() -> { if (closed) { if (completed != null) completed.recycle(); return; } if (completed != null) images.put(key, completed); else failed.put(key, System.currentTimeMillis() + 60000); List<WeakReference<ImageView>> references = pending.remove(key); if (references != null) for (WeakReference<ImageView> reference : references) { ImageView target = reference.get(); if (target != null && key.equals(target.getTag()) && completed != null) target.setImageBitmap(completed); } });
         });
     }
-    void close() { workers.shutdownNow(); images.evictAll(); pending.clear(); }
+    void close() { closed = true; workers.shutdownNow(); images.evictAll(); pending.clear(); }
 }

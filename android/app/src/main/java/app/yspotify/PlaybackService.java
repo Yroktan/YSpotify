@@ -49,7 +49,7 @@ public final class PlaybackService extends Service implements SpotifyEngine.List
     private MediaSession mediaSession;
     SpotifyApi api;
     Catalog catalog;
-    private SpotifyEngine engine;
+    private volatile SpotifyEngine engine;
     private volatile SpotifyEngine.Audio audio = new SpotifyEngine.Audio("", 0, 0, true, false, false);
     private volatile JSONObject track = new JSONObject();
     private volatile List<Song> queue = new ArrayList<>();
@@ -134,8 +134,8 @@ public final class PlaybackService extends Service implements SpotifyEngine.List
     private void start(String uri) {
         ensureForeground(); clickedAt = System.currentTimeMillis(); startedAfterMs = 0; busy = true; pendingUri = uri; error = "";
         if (player.getPlaybackState() == Player.STATE_BUFFERING) player.stop();
-        long version = engine.generation.incrementAndGet(); String source = context; changed();
-        network.execute(() -> { try { engine.play(uri, source, version); } catch (Exception failure) { if (engine.generation.get() == version) showError(failure); } });
+        SpotifyEngine origin = engine; long version = origin.generation.incrementAndGet(); String source = context; changed();
+        network.execute(() -> { try { if (engine == origin) origin.play(uri, source, version); } catch (Exception failure) { if (engine == origin && origin.generation.get() == version) showError(failure); } });
     }
     private void arrange() { List<Integer> arranged = new ArrayList<>(); for (int i = 0; i < queue.size(); i++) arranged.add(i); if (shuffle) { Collections.shuffle(arranged); arranged.remove(Integer.valueOf(queueIndex)); if (queueIndex >= 0) arranged.add(0, queueIndex); } order = arranged; }
     private int nextIndex(int direction) { if (queueIndex < 0 || order.isEmpty()) return -1; int index = order.indexOf(queueIndex) + direction; if (index < 0 || index >= order.size()) { if (!repeat.equals("context")) return -1; index = (index + order.size()) % order.size(); } return order.get(index); }
