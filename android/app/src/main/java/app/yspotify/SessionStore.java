@@ -98,12 +98,14 @@ final class SessionStore {
         if (!exists()) throw new IllegalStateException("SessionRequired");
         synchronized (refreshLock) { if (snapshot().optLong("validUntil") < System.currentTimeMillis() + 60000) refresh(http); }
     }
-    void refresh(OkHttpClient http) throws Exception {
+    void refresh(OkHttpClient http) throws Exception { refresh(http, false); }
+    void refreshClient(OkHttpClient http) throws Exception { refresh(http, true); }
+    private void refresh(OkHttpClient http, boolean withClient) throws Exception {
         synchronized (refreshLock) {
             long expected; JSONObject previous;
             synchronized (this) { if (!exists()) throw new IllegalStateException("SessionRequired"); expected = revision; previous = snapshot(); }
             JSONObject next;
-            try { next = refreshHttp(http, previous); }
+            try { next = withClient && fallback != null ? fallback.refresh(previous) : refreshHttp(http, previous); }
             catch (Exception failure) { if (fallback == null) throw failure; next = fallback.refresh(previous); }
             synchronized (this) { if (revision != expected || !exists()) throw new IllegalStateException("SessionChanged"); save(next); }
         }

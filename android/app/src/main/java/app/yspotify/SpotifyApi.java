@@ -25,7 +25,7 @@ final class SpotifyApi {
             RequestBody payload = body == null ? null : RequestBody.create(body.toString(), MediaType.get("application/json"));
             builder.method(method, payload);
             try (Response response = http.newCall(builder.build()).execute()) {
-                if (response.code() == 401 && attempt == 0) { session.refresh(http); continue; }
+                if (response.code() == 401 && attempt == 0) { session.refreshClient(http); continue; }
                 if (response.code() == 401) throw new IOException("SessionRefreshRequired");
                 if (!response.isSuccessful()) throw new IOException("SpotifyHttp" + response.code());
                 String text = response.body() == null ? "" : response.body().string();

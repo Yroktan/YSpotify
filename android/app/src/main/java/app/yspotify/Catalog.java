@@ -106,7 +106,7 @@ final class Catalog {
         JSONObject object = (JSONObject) value;
         JSONObject wrapper = object.optJSONObject("track"); if (wrapper == null) wrapper = object.optJSONObject("itemV2"); if (wrapper == null) wrapper = object.optJSONObject("item");
         if (wrapper != null && wrapper.optJSONObject("data") != null) {
-            JSONObject track = J.parse(wrapper.optJSONObject("data").toString()); String uri = J.text(track, "uri"); if (uri.isEmpty()) uri = J.text(wrapper, "_uri");
+            JSONObject track = J.parse(wrapper.optJSONObject("data").toString()); String uri = J.text(track, "uri"); if (uri.isEmpty()) uri = J.text(wrapper, "_uri"); if (uri.isEmpty()) uri = J.text(wrapper, "uri"); if (uri.isEmpty() && !J.text(track, "id").isEmpty()) uri = "spotify:track:" + J.text(track, "id");
             try { track.put("uri", uri); track.put("uid", J.text(object, "uid").isEmpty() ? J.text(wrapper, "uid") : J.text(object, "uid")); } catch (Exception ignored) { }
             collect(track, kind, rows, depth + 1); return;
         }
@@ -114,15 +114,15 @@ final class Catalog {
         if (uri.startsWith(kind.equals("library") ? "spotify:playlist:" : "spotify:track:") && !name.isEmpty()) {
             JSONArray artists = J.array(J.obj(object, "artists"), "items"); if (artists.length() == 0) artists = J.array(J.obj(object, "artistsV2"), "items");
             StringBuilder artist = new StringBuilder();
-            for (int i = 0; i < artists.length(); i++) { JSONObject entry = artists.optJSONObject(i); String text = J.text(J.obj(entry, "profile"), "name"); if (text.isEmpty()) text = J.text(entry, "name"); if (!text.isEmpty()) { if (artist.length() > 0) artist.append(", "); artist.append(text); } }
+            for (int i = 0; i < artists.length(); i++) { JSONObject entry = artists.optJSONObject(i); String text = J.text(J.obj(entry, "profile"), "name"); if (text.isEmpty()) text = J.text(entry, "name"); if (text.isEmpty()) text = J.text(J.obj(J.obj(entry, "data"), "profile"), "name"); if (!text.isEmpty()) { if (artist.length() > 0) artist.append(", "); artist.append(text); } }
             JSONObject album = J.obj(object, "albumOfTrack"); if (album.length() == 0) album = J.obj(object, "album");
             JSONArray covers = J.array(J.obj(album, "coverArt"), "sources"); if (covers.length() == 0) covers = J.array(album, "images");
             if (covers.length() == 0) { JSONArray groups = J.array(J.obj(object, "images"), "items"); covers = new JSONArray(); for (int group = 0; group < groups.length(); group++) { JSONArray sources = J.array(groups.optJSONObject(group), "sources"); for (int i = 0; i < sources.length(); i++) covers.put(sources.opt(i)); } }
             String cover = ""; int distance = Integer.MAX_VALUE;
             for (int i = 0; i < covers.length(); i++) { JSONObject image = covers.optJSONObject(i); String url = J.text(image, "url"); int delta = Math.abs(image.optInt("width", 64) - 64); if (url.startsWith("https://") && delta < distance) { cover = url; distance = delta; } }
             long milliseconds = J.obj(object, "duration").optLong("totalMilliseconds", J.obj(object, "trackDuration").optLong("totalMilliseconds"));
-            String owner = J.text(J.obj(J.obj(object, "ownerV2"), "data"), "username");
-            boolean editable = object.optBoolean("isOwnedBySelf") || !owner.isEmpty() && owner.equals(username);
+            String owner = J.text(J.obj(J.obj(object, "ownerV2"), "data"), "username"); if (owner.isEmpty()) owner = J.text(J.obj(object, "owner"), "username");
+            JSONObject permissions = J.obj(object, "permissions"); boolean editable = object.optBoolean("isOwnedBySelf") || permissions.optBoolean("canAdd") || permissions.optBoolean("canEdit") || !owner.isEmpty() && owner.equals(username);
             Song row = new Song(J.o("uri", uri, "uid", J.text(object, "uid"), "name", name, "artist", kind.equals("library") ? "Плейлист" : artist.toString(), "album", J.text(album, "name"), "cover", cover, "duration", milliseconds == 0 ? "" : (milliseconds / 60000) + ":" + String.format(java.util.Locale.ROOT, "%02d", milliseconds / 1000 % 60), "saved", kind.equals("liked"), "owner", owner, "editable", editable));
             rows.put(kind.equals("playlist") ? uri + '#' + row.uid : uri, row);
             return;
