@@ -31,6 +31,7 @@ branding/ICON-PROMPT.txt
 *.jks
 *.keystore
 *.apk
+*.apk.sha256
 *.aab
 *.p12
 *.idsig

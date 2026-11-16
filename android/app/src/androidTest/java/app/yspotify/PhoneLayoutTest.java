@@ -42,7 +42,8 @@ public class PhoneLayoutTest {
         android.app.Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Bitmap image = instrumentation.getUiAutomation().takeScreenshot(); assertNotNull(image);
         String suffix = instrumentation.getTargetContext().getResources().getConfiguration().fontScale + "_" + image.getWidth();
-        File directory = instrumentation.getTargetContext().getExternalFilesDir("screenshots"); assertNotNull(directory); directory.mkdirs();
+        String output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir");
+        File directory = output == null ? instrumentation.getTargetContext().getExternalFilesDir("screenshots") : new File(output, "screenshots"); assertNotNull(directory); directory.mkdirs();
         try (FileOutputStream output = new FileOutputStream(new File(directory, name + '_' + suffix + ".png"))) { assertTrue(image.compress(Bitmap.CompressFormat.PNG, 100, output)); }
         image.recycle();
     }
