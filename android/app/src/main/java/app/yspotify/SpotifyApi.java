@@ -17,6 +17,7 @@ final class SpotifyApi {
     final SessionStore session;
     volatile String endpoint = "https://spclient.wg.spotify.com";
     SpotifyApi(Context context) { session = new SessionStore(context.getApplicationContext()); }
+    static OkHttpClient streaming(OkHttpClient client) { return client.newBuilder().callTimeout(0, TimeUnit.MILLISECONDS).readTimeout(20, TimeUnit.SECONDS).build(); }
     JSONObject request(String url, String method, JSONObject body) throws Exception {
         session.ensureFresh(http);
         for (int attempt = 0; attempt < 2; attempt++) {

@@ -72,7 +72,7 @@ public final class PlaybackService extends Service implements SpotifyEngine.List
         NotificationManager notifications = getSystemService(NotificationManager.class);
         notifications.createNotificationChannel(new NotificationChannel("playback", "Воспроизведение", NotificationManager.IMPORTANCE_LOW));
         volume = getSharedPreferences("player", MODE_PRIVATE).getFloat("volume", .8f);
-        OkHttpDataSource.Factory data = new OkHttpDataSource.Factory(api.http);
+        OkHttpDataSource.Factory data = new OkHttpDataSource.Factory(SpotifyApi.streaming(api.http));
         DefaultMediaSourceFactory media = new DefaultMediaSourceFactory(data);
         media.setDrmSessionManagerProvider(item -> {
             MediaItem.DrmConfiguration configuration = item.localConfiguration == null ? null : item.localConfiguration.drmConfiguration;
