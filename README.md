@@ -1,5 +1,7 @@
 # YSpotify
 
+Скачать: [Windows 0.8.2](https://github.com/Yroktan/YSpotify/releases/tag/v0.8.2) · [Android 0.1.0 — предварительная сборка](https://github.com/Yroktan/YSpotify/releases/tag/v0.1.0-android).
+
 Клиент Spotify Free для Windows x64: собственный интерфейс Windows Forms, зелёная тема и контур Уцухо. Музыка поступает с Spotify через штатный Widevine; реклама и ограничения аккаунта определяются Spotify.
 
 В версии0.8.2 исправлена загрузка избранного с недоступными песнями: страницы дочитываются по исходным записям и totalCount. Неполный ответ не заменяет сохранённый список; обновление сохраняет текущую позицию прокрутки.

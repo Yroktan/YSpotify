@@ -1,0 +1,43 @@
+{
+    "version":  "0.1.0",
+    "status":  "prerelease",
+    "apk":  "YSpotify-Android-0.1.0.apk",
+    "bytes":  2683821,
+    "sha256":  "c9f95495ee899b58a5717a324b5f979a6174cc10251e635ea88daf3ea12d7e22",
+    "signerSha256":  "1f007cd831c17320ed7dbeea41915c93d0bb05163eac41d7b72fea19abe9bec1",
+    "signatureVerified":  true,
+    "sourceCommit":  "9e7f522d966645abce63a56d4400be452b49dfc2",
+    "ciUrl":  "https://github.com/Yroktan/YSpotify/actions/runs/43922812676",
+    "jvmTests":  6,
+    "jvmFailures":  0,
+    "lintReleaseErrors":  0,
+    "instrumentation":  {
+                            "testsPerConfiguration":  6,
+                            "configurations":  2,
+                            "totalExecutions":  12,
+                            "failures":  0,
+                            "device":  "Android 15 API 35 x86_64 emulator",
+                            "normalFontScale":  1,
+                            "largeFontScale":  1.5,
+                            "normalPortraitPixels":  "1080x2340",
+                            "narrowPortraitPixels":  "840x1440",
+                            "checks":  [
+                                           "complete first song row in both orientations",
+                                           "visible full-player play control",
+                                           "encrypted session restoration",
+                                           "logout during refresh",
+                                           "native startup and login page without account",
+                                           "throttled HTTPS WAV playback position \u003e=23000ms"
+                                       ]
+                        },
+    "emulatorMemory":  {
+                           "scenario":  "Fresh debug app startup without Spotify account; no music",
+                           "pssKiB":  54950,
+                           "rssKiB":  151712
+                       },
+    "spotifyAccountLoginVerified":  false,
+    "spotifyDrmPlaybackVerified":  false,
+    "googleLoginVerified":  false,
+    "physicalPhoneConnected":  false,
+    "spotifyPlaybackMemoryVerified":  false
+}
