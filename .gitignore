@@ -4,13 +4,15 @@
 *.zip
 *.png
 !branding/*.png
+!android/app/src/main/res/**/*.png
+!android/design/*.png
 *.log
 startup-error.txt
 settings.json
 Browser/
 runtime/
 profile/
-assets/
+/assets/
 STATUS.txt
 CONTINUE.md
 README.txt
@@ -30,4 +32,7 @@ branding/ICON-PROMPT.txt
 *.keystore
 *.apk
 *.aab
+*.p12
+*.idsig
+android/ui-screenshots/
 validation/latency-regional-before-context.json

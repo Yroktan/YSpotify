@@ -1,0 +1,14 @@
+<resources>
+    <item type="id" name="song_list" />
+    <item type="id" name="search_input" />
+    <item type="id" name="search_button" />
+    <item type="id" name="account_button" />
+    <item type="id" name="tab_search" />
+    <item type="id" name="tab_liked" />
+    <item type="id" name="tab_library" />
+    <item type="id" name="play_button" />
+    <item type="id" name="previous_button" />
+    <item type="id" name="next_button" />
+    <item type="id" name="current_title" />
+    <item type="id" name="status_text" />
+</resources>
