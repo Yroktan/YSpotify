@@ -1,4 +1,4 @@
-param([ValidateSet('Debug','Release')][string]$Configuration='Release',[switch]$SkipChecks)
+param([ValidateSet('Debug','Release')][string]$Configuration='Release',[switch]$SkipChecks,[switch]$Native)
 $ErrorActionPreference='Stop'
 $tools=Join-Path $env:USERPROFILE 'YSpotifyTools'
 if(-not $env:GRADLE_USER_HOME -and (Test-Path -LiteralPath (Join-Path $tools 'gradle-cache'))){$env:GRADLE_USER_HOME=Join-Path $tools 'gradle-cache'}
@@ -33,12 +33,17 @@ try{
   }
  }
  $tasks=@(':app:assemble'+$Configuration)
- if(-not $SkipChecks){$tasks+=@(':app:testDebugUnitTest',(':app:lint'+$Configuration))}
+ if(-not $SkipChecks){
+  if(-not $Native){$tasks+=':app:testDebugUnitTest'}
+  $tasks+=(':app:lint'+$Configuration)
+ }
+ if($Native){$tasks+='-PyspotifyNative=true'}
  & (Join-Path $PSScriptRoot 'android\gradlew.bat') -p (Join-Path $PSScriptRoot 'android') @tasks --console plain
  if($LASTEXITCODE -ne 0){throw 'Android build or checks failed'}
  $variant=$Configuration.ToLowerInvariant()
  $apk=Join-Path $PSScriptRoot ('android\app\build\outputs\apk\'+$variant+'\app-'+$variant+'.apk')
- $target=Join-Path $PSScriptRoot ('YSpotify-Android-0.1.0'+$(if($Configuration -eq 'Debug'){'-debug'}else{''})+'.apk')
+ $version=if($Native){'0.2.0'}else{'0.1.0'}
+ $target=Join-Path $PSScriptRoot ('YSpotify-Android-'+$version+$(if($Configuration -eq 'Debug'){'-debug'}else{''})+'.apk')
  Copy-Item -LiteralPath $apk -Destination $target -Force
  Get-FileHash -LiteralPath $target -Algorithm SHA256 | Select-Object Path,Hash
 }finally{
