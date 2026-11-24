@@ -1,4 +1,5 @@
 *.exe
+YSpotify-recommendations.exe.config
 *.dll
 *.pdb
 *.zip

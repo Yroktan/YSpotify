@@ -194,6 +194,7 @@ namespace YSpotify {
     class Welcome : Panel {
         public event EventHandler Launch;
         public event Action<string> SearchRequested,PageRequested;
+        public event Action OpenRecommendationsRequested;
         public event Action<SongRow> SongRequested;
         public event Action PlayRequested,NextRequested,PreviousRequested;
         public event Action<double> VolumeRequested,SeekRequested;
@@ -206,6 +207,7 @@ namespace YSpotify {
         readonly SongList songs;
         readonly Label heading,description,empty,now,artist,time;
         readonly FlatButton account;
+        readonly FlatButton openRecommendations;
         readonly MediaButton play,previous,next;
         readonly SeekLine progress,volume;
         readonly PictureBox cover;
@@ -226,9 +228,9 @@ namespace YSpotify {
         public Welcome(){
             DoubleBuffered=true;BackColor=bg;ForeColor=Color.FromArgb(231,239,232);
             var rail=new Panel{Dock=DockStyle.Left,Width=198,BackColor=Color.FromArgb(12,20,16),Padding=new Padding(16,22,16,16)};Controls.Add(rail);
-            var stack=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false};rail.Controls.Add(stack);
+            var stack=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true};rail.Controls.Add(stack);
             stack.Controls.Add(Caption("МОЯ МУЗЫКА",new Padding(11,0,0,16)));
-            foreach(string text in new[]{"Поиск","Любимое","Плейлисты"}){
+            foreach(string text in new[]{"Поиск","Рекомендации","Любимое","Плейлисты"}){
                 var button=new FlatButton(text){Width=164,Height=42,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(10,0,0,0),BackColor=rail.BackColor,Margin=new Padding(0,0,0,6)};
                 tabs.Add(text,button);button.Click+=delegate{SelectTab(text);if(!previewMode&&PageRequested!=null)PageRequested(text);};stack.Controls.Add(button);
             }
@@ -246,7 +248,14 @@ namespace YSpotify {
             top.Controls.Add(search,0,0);top.Controls.Add(find,1,0);top.Controls.Add(account,2,0);body.Controls.Add(top);
             var headingArea=new Panel{Dock=DockStyle.Top,Height=101,Padding=new Padding(0,13,0,12)};body.Controls.Add(headingArea);headingArea.BringToFront();
             heading=new Label{Dock=DockStyle.Top,Height=43,Text="Поиск",Font=new Font("Segoe UI Semibold",24),TextAlign=ContentAlignment.MiddleLeft};
-            description=new Label{Dock=DockStyle.Top,Height=26,Text="Найди то, что хочется послушать",ForeColor=muted,Font=new Font("Segoe UI",10),TextAlign=ContentAlignment.MiddleLeft};headingArea.Controls.Add(description);headingArea.Controls.Add(heading);
+            description=new Label{Dock=DockStyle.Fill,Height=26,Text="Найди то, что хочется послушать",ForeColor=muted,Font=new Font("Segoe UI",10),TextAlign=ContentAlignment.MiddleLeft};
+            var headingFooter=new Panel{Dock=DockStyle.Top,Height=30};
+            openRecommendations=new FlatButton("Открыть в Spotify"){Dock=DockStyle.Right,Width=148,BackColor=Color.FromArgb(35,57,42),Visible=false};
+            openRecommendations.Click+=delegate{if(OpenRecommendationsRequested!=null)OpenRecommendationsRequested();};
+            headingFooter.Controls.Add(description);
+            headingFooter.Controls.Add(openRecommendations);
+            headingArea.Controls.Add(headingFooter);
+            headingArea.Controls.Add(heading);
             body.Controls.SetChildIndex(top,body.Controls.Count-1);
             var listArea=new Panel{Dock=DockStyle.Fill};body.Controls.Add(listArea);listArea.BringToFront();
             songs=new SongList{Dock=DockStyle.Fill,View=View.Details,FullRowSelect=true,MultiSelect=false,HideSelection=false,BorderStyle=BorderStyle.None,BackColor=bg,ForeColor=ForeColor,HeaderStyle=ColumnHeaderStyle.Nonclickable};
@@ -288,11 +297,15 @@ namespace YSpotify {
         }
         Label Caption(string text,Padding margin){return new Label{Text=text,ForeColor=Color.FromArgb(98,126,107),Font=new Font("Segoe UI Semibold",8),Width=155,Height=18,Margin=margin};}
         void SelectTab(string name){foreach(var pair in tabs)pair.Value.BackColor=pair.Key==name?Color.FromArgb(30,55,38):Color.FromArgb(12,20,16);}
-        void DoSearch(){if(!previewMode&&!string.IsNullOrWhiteSpace(search.Text)&&SearchRequested!=null)SearchRequested(search.Text.Trim());}
+        void DoSearch(){if(!previewMode&&!string.IsNullOrWhiteSpace(search.Text)&&SearchRequested!=null){SelectTab("Поиск");SearchRequested(search.Text.Trim());}}
         void PlaySelection(){if(!previewMode&&songs.SelectedItems.Count>0&&SongRequested!=null)SongRequested(songs.SelectedItems[0].Tag as SongRow);}
         void FitColumns(){int w=Math.Max(280,songs.Parent==null?songs.ClientSize.Width:songs.Parent.ClientSize.Width);songs.Columns[0].Width=(w-84)*37/100;songs.Columns[1].Width=(w-84)*27/100;songs.Columns[2].Width=(w-84)*36/100;songs.Columns[3].Width=w-songs.Columns[0].Width-songs.Columns[1].Width-songs.Columns[2].Width;}
-        public void SetHeading(string text){heading.Text=text;description.Text=text=="Поиск"?"Найди то, что хочется послушать":"Твоя музыка";}
-        public void Loading(string message){signature="";songs.Items.Clear();empty.Text=message;empty.Visible=true;}
+        public void SetHeading(string text){
+            heading.Text=text;
+            openRecommendations.Visible=text=="Рекомендации";
+            description.Text=text=="Поиск"?"Найди то, что хочется послушать":text=="Рекомендации"?"Подборки Spotify для тебя":"Твоя музыка";
+        }
+        public void Loading(string message){signature="";currentRows=new List<SongRow>();songs.Items.Clear();empty.Text=message;empty.Visible=true;}
         public void SetRows(List<SongRow> rows){
             currentRows=rows;
             string nextSignature=string.Join("|",rows.ConvertAll(x=>x.Uri+":"+x.Name+":"+x.Artist+":"+x.Album+":"+x.Duration+":"+x.Cover+":"+x.Uid+":"+x.Saved+":"+x.CanEdit).ToArray());if(nextSignature==signature&&rows.Count>0)return;signature=nextSignature;

@@ -205,7 +205,18 @@ namespace YSpotify {
             welcome.SeekRequested+=async delegate(double value){try{if(await EnsureEngine()){await MiniCall(new Dictionary<string,object>{{"action","seek"},{"fraction",value}});await ReadMiniState();}}catch(Exception ex){SetStatus(MiniMessage(ex.Message));}};
             welcome.ModeRequested+=async delegate(string mode){try{if(await EnsureEngine()){await MiniCall(new Dictionary<string,object>{{"action","mode"},{"kind",mode}});await ReadMiniState();}}catch(Exception ex){SetStatus(MiniMessage(ex.Message));}};
             welcome.SearchRequested+=async delegate(string query){view="Поиск";welcome.SetHeading("Результаты поиска");await MiniRows("search",query,false);};
-            welcome.PageRequested+=async delegate(string page){view=page;welcome.SetHeading(page);if(page=="Поиск"){welcome.Loading("Введи название трека или исполнителя");return;}await MiniRows(page=="Любимое"?"liked":"library",null,page=="Плейлисты");};
+            welcome.OpenRecommendationsRequested+=delegate{OpenDesktopLink("https://open.spotify.com/made-for-you");};
+            welcome.PageRequested+=async delegate(string page){
+                view=page;
+                welcome.SetHeading(page);
+                if(page=="Поиск"){
+                    ++miniQueryVersion;
+                    welcome.Loading("Введи название трека или исполнителя");
+                    return;
+                }
+                string kind=page=="Рекомендации"?"recommendations":page=="Любимое"?"liked":"library";
+                await MiniRows(kind,null,page=="Плейлисты");
+            };
             welcome.SongRequested+=async delegate(SongRow song){
                 if(song==null)return;
                 if(song.Uri.StartsWith("spotify:playlist:")){miniPlaylistEditable=song.CanEdit;view="Треки";welcome.SetHeading(song.Name);await MiniRows("playlist",song.Uri,false);return;}
@@ -236,18 +247,49 @@ namespace YSpotify {
                 var reply=await MiniCall(new Dictionary<string,object>{{"action","query"},{"kind",kind},{"argument",argument}}) as Dictionary<string,object>;
                 if(version!=miniQueryVersion||closing)return;
                 var rows=MiniSongRows(reply);
+                if(kind=="recommendations"&&rows.Count==0){
+                    welcome.Loading("Подборки пока недоступны. Попробуй открыть их в Spotify.");
+                    SetStatus("Нет рекомендаций");
+                    return;
+                }
                 welcome.SetRows(rows);if(playlists)welcome.SetPlaylists(rows);SetStatus(rows.Count+" · загружено");
             }catch(Exception ex){if(version==miniQueryVersion){if(!haveCache)welcome.Loading("Не удалось загрузить список");SetStatus(haveCache?"Показан сохранённый список · "+MiniMessage(ex.Message):MiniMessage(ex.Message));}}
         }
         List<SongRow> MiniSongRows(Dictionary<string,object> reply){var rows=new List<SongRow>();if(reply==null||!reply.ContainsKey("rows"))return rows;foreach(var item in reply["rows"] as object[]){var row=item as Dictionary<string,object>;rows.Add(new SongRow{Uri=Value(row,"uri"),Name=Value(row,"name"),Artist=Value(row,"artist"),Album=Value(row,"album"),Duration=Value(row,"duration"),Cover=Value(row,"cover"),Uid=Value(row,"uid"),Saved=Flag(row,"saved"),CanEdit=Flag(row,"canEdit")});}return rows;}
+        void OpenDesktopLink(string url){
+            try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url){UseShellExecute=true});}
+            catch(Exception){SetStatus("Не удалось открыть ссылку");}
+        }
+        void AddShareMenu(System.Windows.Forms.ContextMenuStrip menu,SongRow song){
+            var match=System.Text.RegularExpressions.Regex.Match(song.Uri,@"^spotify:(track|playlist):([a-zA-Z0-9]{22})$");
+            if(!match.Success)return;
+            string url="https://open.spotify.com/"+match.Groups[1].Value+"/"+match.Groups[2].Value;
+            var share=new System.Windows.Forms.ToolStripMenuItem("Поделиться");
+            share.DropDownItems.Add("В Telegram",null,delegate{
+                OpenDesktopLink("https://t.me/share/url?url="+Uri.EscapeDataString(url));
+            });
+            share.DropDownItems.Add("В WhatsApp",null,delegate{
+                OpenDesktopLink("https://wa.me/?text="+Uri.EscapeDataString(url));
+            });
+            share.DropDownItems.Add("Копировать ссылку",null,delegate{
+                try{System.Windows.Forms.Clipboard.SetText(url);SetStatus("Ссылка скопирована");}
+                catch(System.Runtime.InteropServices.ExternalException){SetStatus("Не удалось скопировать ссылку");}
+            });
+            menu.Items.Add(share);
+        }
         async void ShowSongMenu(SongRow song,System.Drawing.Point point){
-            if(song==null||!song.Uri.StartsWith("spotify:track:"))return;
-            string playlist=miniRowsKind=="playlist"?miniRowsArgument:null;
+            if(song==null||string.IsNullOrEmpty(song.Uri))return;
             var menu=new System.Windows.Forms.ContextMenuStrip{BackColor=bg,ForeColor=ForeColor,ShowImageMargin=false};
+            AddShareMenu(menu,song);
+            bool isTrack=song.Uri.StartsWith("spotify:track:");
+            if(!isTrack&&menu.Items.Count==0){menu.Dispose();return;}
+            menu.Closed+=delegate{if(IsHandleCreated&&!IsDisposed)BeginInvoke(new Action(menu.Dispose));else menu.Dispose();};
+            if(!isTrack){menu.Show(point);return;}
+            string playlist=miniRowsKind=="playlist"?miniRowsArgument:null;
             var favorite=new System.Windows.Forms.ToolStripMenuItem("Проверяю избранное…"){Enabled=false};menu.Items.Add(favorite);
             var add=new System.Windows.Forms.ToolStripMenuItem("Добавить в плейлист");menu.Items.Add(add);add.DropDownItems.Add(new System.Windows.Forms.ToolStripMenuItem("Загружаю…"){Enabled=false});
             if(playlist!=null&&miniPlaylistEditable){var remove=new System.Windows.Forms.ToolStripMenuItem("Убрать из этого плейлиста"){Enabled=!string.IsNullOrEmpty(song.Uid)};remove.Click+=async delegate{await MiniMutation("removePlaylist",song,playlist);};menu.Items.Add(remove);}
-            menu.Closed+=delegate{menu.Dispose();};menu.Show(point);
+            menu.Show(point);
             try{
                 var saved=await MiniCall(new Dictionary<string,object>{{"action","saved"},{"uri",song.Uri}}) as Dictionary<string,object>;
                 song.Saved=Flag(saved,"saved");if(menu.IsDisposed)return;favorite.Text=song.Saved?"Убрать из избранного":"Добавить в избранное";favorite.Enabled=true;

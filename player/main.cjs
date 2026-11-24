@@ -50,6 +50,77 @@ function queuePlayback(request){
 }
 const idleUrl = 'https://open.spotify.com/robots.txt';
 const welcomeUrl = 'https://accounts.spotify.com/login?continue=' + encodeURIComponent('https://open.spotify.com/search');
+const madeForYouUrl = 'https://open.spotify.com/genre/0JQ5DAt0tbjZptfcdMSKl3';
+let recommendationsPending;
+
+async function readRecommendations(browserSession) {
+  const page = new BrowserWindow({
+    show: false,
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      session: browserSession, sandbox: true, contextIsolation: true,
+      nodeIntegration: false, backgroundThrottling: false, autoplayPolicy: 'user-gesture-required'
+    }
+  });
+  page.webContents.setAudioMuted(true);
+  page.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const isSpotifyPage = url => {
+    try { return new URL(url).origin === 'https://open.spotify.com'; }
+    catch { return false; }
+  };
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    page.webContents.on(eventName, (event, url) => {
+      if (!isSpotifyPage(url)) event.preventDefault();
+    });
+  }
+  const readRows = async () => {
+    await page.loadURL(madeForYouUrl, {
+      userAgent: browserSession.getUserAgent().replace(/\s(?:Electron|YSpotify)\/\S+/g, '')
+    });
+    let rows = [];
+    for (let attempt = 0; attempt < 16; attempt++) {
+      if (!isSpotifyPage(page.webContents.getURL())) break;
+      const nextRows = await page.webContents.executeJavaScript(`(() => {
+        if (location.origin !== 'https://open.spotify.com') return [];
+        const lists = new Map();
+        for (const link of document.querySelectorAll('main a[href*="/playlist/"]')) {
+          let url;
+          try { url = new URL(link.href); } catch { continue; }
+          const match = /^\\/(?:intl-[a-z-]+\\/)?playlist\\/([a-zA-Z0-9]{22})\\/?$/.exec(url.pathname);
+          if (url.origin !== location.origin || !match) continue;
+          const name = (link.textContent.trim() || link.getAttribute('aria-label') || link.querySelector('img')?.alt || '').trim();
+          if (!name) continue;
+          const uri = 'spotify:playlist:' + match[1];
+          if (!lists.has(uri)) lists.set(uri, { uri, name: name.slice(0, 200), artist: 'Подборка Spotify' });
+        }
+        return [...lists.values()].slice(0, 100);
+      })()`);
+      if (nextRows.length && nextRows.length === rows.length &&
+          nextRows.every((row, index) => row.uri === rows[index].uri)) return { rows: nextRows };
+      rows = nextRows;
+      await new Promise(resolve => setTimeout(resolve, 750));
+    }
+    return { rows };
+  };
+  let timer;
+  try {
+    return await Promise.race([
+      readRows(),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('RecommendationsUnavailable')), 20000); })
+    ]);
+  } finally {
+    clearTimeout(timer);
+    if (!page.isDestroyed()) page.destroy();
+  }
+}
+
+function recommendations(browserSession) {
+  if (!recommendationsPending) {
+    recommendationsPending = readRecommendations(browserSession).finally(() => { recommendationsPending = null; });
+  }
+  return recommendationsPending;
+}
 
 async function setSession(value) {
   if (service) await service.stop();
@@ -96,6 +167,9 @@ async function dispatch(request) {
   if (request.action === 'finishLogin') return { completed:await finishLogin() };
   if (request.action === 'query') {
     if(!service)throw new Error('SessionExpired');
+    if (request.kind === 'recommendations') {
+      return request.cacheOnly ? { rows: [] } : recommendations(window.webContents.session);
+    }
     return library.query(request.kind,request.argument,request);
   }
   if(request.action==='saved'){if(!library)throw new Error('SessionExpired');return {saved:await library.saved(request.uri)};}
